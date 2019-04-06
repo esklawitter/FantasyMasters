@@ -1,7 +1,8 @@
 import logging
 from masters.livedata import PGADataExtractor
 def app() -> None:
-    pga_extractor = PGADataExtractor()
+    pga_extractor = PGADataExtractor('sqlite:///masters.db')
+    pga_extractor.refresh(force=True)
 
 
 
