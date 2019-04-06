@@ -1,3 +1,4 @@
+import pandas as pd
 def get_leaderboard() -> list:
 
 
@@ -17,6 +18,11 @@ class Team(object):
     @property
     def score(self)->int:
         for player in players
+
+
+
+def calculate_defaults(board: pd.DataFrame) -> []:
+
 
 
 
