@@ -2,7 +2,8 @@ import logging
 from masters.livedata import PGADataExtractor
 from masters.models import  Competition
 
-TEAMS_CSV = 'BOGUS_TEAMS.csv'
+TEAMS_CSV = 'teams.csv'
+TEAMS_CSV = 'test_teams.csv'
 
 '''
     general architecture:
@@ -22,7 +23,8 @@ TEAMS_CSV = 'BOGUS_TEAMS.csv'
 def app() -> None:
     pga_extractor = PGADataExtractor()
     pga_extractor.refresh(force=True)
-    comp = Competition(TEAMS_CSV, pga_extractor.field)
+    comp = Competition(pga_extractor.field, TEAMS_CSV)
+    comp.get_standings(pga_extractor.defaults)
     return
 
 
