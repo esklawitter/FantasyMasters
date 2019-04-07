@@ -119,17 +119,17 @@ class Field(object):
     def __init__(self):
         self.golfers = []
 
-    def get_golfer_from_name(self, first, last) -> Golfer:
+    def get_golfer_from_name(self, first, last, silent = False) -> Golfer:
         for player in self.golfers:
             if player.first_name.lower() == first.lower() and player.last_name.lower() == last.lower():
                 return player
-
-        error(f"unable to find player: {first} {last}")
+        if not silent:
+            error(f"unable to find player: {first} {last}")
         return
 
     def upsert_golfer(self, player_info):
         player= self.get_golfer_from_name(player_info['player_bio']['first_name'],
-                                           player_info['player_bio']['last_name'])
+                                           player_info['player_bio']['last_name'], silent=True)
         if player:
             player.update(player_info, self.par)
         else:
