@@ -5,29 +5,36 @@ import csv
 
 class Competition(object):
 
-    def __init__(self, field: list, team_filename: str):
+    def __init__(self, field: list, team_filename: str, defaults:list):
         # initializes a competition from a list of golfers and a path to a team name:team members file
         self.teams = []
+        self.defaults = defaults
         with open(team_filename) as f:
             reader = csv.reader(f)
             for line in reader:
                 info(f'initializing team: {line[0]}')
-                self.teams.append(FantasyTeam(line[0], [player.replace('-', ' ') for player in line[1:]], field))
+                self.teams.append(FantasyTeam(line[0], [player.replace('-', ' ') for player in line[1:]], field, defaults))
             info('All teams initialized')
         return
 
 
-    def get_standings(self, defaults):
-        return self.teams.sort(key=lambda team: team.get_score_with_defaults(defaults))
+    def get_standings(self):
+        self.teams.sort(key=lambda team: team.score)
+        return self.teams
 
 
 
 
 class FantasyTeam(object):
 
-    def __init__(self, team_name: str, members: list, field: list):
+    def __init__(self, team_name: str, members: list, field: list, defaults):
         self.name = team_name
+        self.defaults = defaults
         self.players = self._get_members_from_field(members, field)
+
+    @property
+    def score(self):
+        return self.get_score_with_defaults()
 
     def _get_members_from_field(self, members: list, field: list):
         # take list of players and list of identifiers to return list of references to players
@@ -37,13 +44,13 @@ class FantasyTeam(object):
             teammates.append(field.get_golfer_from_name(name_parts[0], name_parts[1]))
         return teammates
 
-    def get_score_with_defaults(self, defaults):
+    def get_score_with_defaults(self):
         scores = []
         team_score = 0
         for player in self.players:
-            total, penalty, rounds = player.get_score_or_default(defaults)
+            total, penalty, rounds = player.get_score_or_default(self.defaults)
             # replace all non-integers with default (withdrawn, cut)
-            defaulted = [score if isinstance(score, int) else defaults[i] for i, score in enumerate(rounds)]
+            defaulted = [score if isinstance(score, int) else self.defaults[i] for i, score in enumerate(rounds)]
             scores.append(defaulted)
         score_grid = pd.DataFrame(scores, columns = [str(i) for i in range(1,5)])
         for i in range(1,3):
@@ -81,6 +88,7 @@ class Golfer(object):
                 round['score'] = raw['today']
 
     def get_score_or_default(self, defaults):
+        #todo: refactor this to better align with access pattern (eg, no need for separate penalty)
         scores = [round['score'] if round['score'] else 0 for round in self.rounds]
 
         if self.status == 'active':
@@ -117,6 +125,7 @@ class Golfer(object):
 
 class Field(object):
     def __init__(self):
+        self.par = None
         self.golfers = []
 
     def get_golfer_from_name(self, first, last, silent = False) -> Golfer:
