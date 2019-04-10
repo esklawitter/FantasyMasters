@@ -37,7 +37,7 @@ class FantasyTeam(object):
 
     @property
     def score(self):
-        return self.get_score_with_defaults()
+        return self.get_score_with_defaults()[0]
 
     def _get_members_from_field(self, members: list, field: list):
         # take list of players and list of identifiers to return list of references to players
@@ -50,20 +50,31 @@ class FantasyTeam(object):
     def get_score_with_defaults(self):
         scores = []
         team_score = 0
+        daily_scores = [0, 0, 0, 0]
         for player in self.players:
             total, rounds = player.get_score_or_default()
             # replace all non-integers with default (withdrawn, cut)
-            defaulted = [score if isinstance(score, int) else self.defaults[i] for i, score in enumerate(rounds)]
+            defaulted = [player] + [
+                {'score': score, 'score_str': self.add_plus(score), 'undefaulted': score,
+                 'undef_str': self.add_plus(score), 'counted': False, 'is_penalty': False} if isinstance(score,
+                                                                                                         int) else {
+                    'score': self.defaults[i], 'score_str': self.add_plus(self.defaults[i]), 'undefaulted': score,
+                    'undef_str': score, 'counted': False, 'is_penalty': True} for i, score in enumerate(rounds)]
             scores.append(defaulted)
-        score_grid = pd.DataFrame(scores, columns=[str(i) for i in range(1, 5)])
-        for i in range(1, 3):
-            team_score += score_grid[str(i)].sum()
-        for i in range(3, 5):
-            team_score += score_grid[str(i)].nsmallest(3).sum()
-        return team_score
+
+        for i in range(1, 5):
+            scores.sort(key=lambda x: x[i]['score'])  # this is ugly because player is the first item in the array
+            for j in range(5 if i < 3 else 3):
+                daily_scores[i - 1] += scores[j][i]['score']
+                scores[j][i]['counted'] = True
+            team_score += daily_scores[i - 1]
+        return team_score, scores, daily_scores
 
     def get_scores_df(self):
         return pd.DataFrame([golfer.get_raw_score_dict() for golfer in self.players])
+
+    def add_plus(self, score):
+        return f'+{score}' if score >= 0 else f'{score}'
 
 
 class Golfer(object):

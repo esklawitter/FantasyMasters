@@ -1,51 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
-<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
-      integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
+      integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+
+<!-- Latest compiled and minified JavaScript -->
+
 <head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
     <title>Fantasy Masters - 2019</title>
 </head>
+<style>
+tr.collapse.in {
+  display:table-row;
+}
+
+.score{
+text-align:center;
+}
+
+
+</style>
+
 <body>
-<div id="Standings Timestamp"><h1>Standings as of: {{ pga_extractor.results_timestamp }}</h1></div>
-<div class="table-responsive">
-<table class="table">
-    <tr>
-        <th>Team</th>
-        <th>Score</th>
-        <th>Golfer</th>
-        <th>Status</th>
-        <th> Total</th>
-        <th>Thru/Next Tee</th>
-        <th>Round 1</th>
-        <th>Round 2</th>
-        <th>Round 3</th>
-        <th>Round 4</th>
-    </tr>
-    <tr>
-        <th colspan="6"> Penalty Scores
-        </th>
-        {% for pen in pga_extractor.defaults %}
-        <th> {{ pen }}</th>
+<div id="Standings Timestamp">
+    <h1 class="display-2"> Fantasy Masters 2019</h1>
+    <h3>Standings as of: {{ pga_extractor.results_timestamp.strftime('%a %I:%M%p') }}</h3></div>
+<div>
+    <table class="table table-striped table-hover">
+        <thead class="thead-dark">
+        <tr>
+            <th>Golfer</th>
+            <th>Status</th>
+            <th> Total</th>
+            <th>Thru/Next Tee</th>
+            <th class="score">Round 1</th>
+            <th class="score">Round 2</th>
+            <th class="score">Round 3</th>
+            <th class="score">Round 4</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for team in comp.standings %}
+        <tr data-toggle="collapse" data-target=".{{ team.name }}" class="table-primary">
+            <th>{{ team.name }}</th>
+            <th>Total Score:</th>
+            <th>{{ team.add_plus(team.score) }}</th>
+            <th>Daily Totals</th>
+            {% for day in team.get_score_with_defaults()[2] %}
+            <th class="score">{{ team.add_plus(day) }}</th>
+            {% endfor %}
+        </tr>
+        {% for player in team.get_score_with_defaults()[1] %}
+        <tr class="collapse {{ team.name }}">
+            <td class>{{ player[0].first_name }} {{ player[0].last_name }}</td>
+            <td>{{ player[0].status.capitalize() }}</td>
+            <td>{{ team.add_plus(player[0].get_score_or_default()[0]) }}</td>
+            <td>{{ player[0].get_today() }}</td>
+            {% for round in player[1:] %}
+            <td class="score {{ 'table-warning' if round['counted'] and not round['is_penalty'] else '' }}{{ 'table-danger' if round['counted'] and round['is_penalty'] else '' }}">
+                {{ round['undef_str'] }} {{ '(' ~ round['score_str'] ~ ')' if round['undefaulted'] is string else '' }}
+            </td>
+            {% endfor %}
+        </tr>
         {% endfor %}
-    </tr>
-    {% for team in comp.standings %}
-    <tr>
-        <td rowspan="5">{{ team.name }}</td>
-        <td rowspan="5">{{ team.score }}</td>
-        {% for player in team.players %}
-        <td>{{ player.first_name }} {{ player.last_name }}</td>
-        <td>{{ player.status }}</td>
-        <td>{{ player.get_score_or_default()[0] }}</td>
-        <td>{{ player.get_today() }}</td>
-        {% for round in player.rounds %}
-        <td>{{ round['score'] if round['score'] is not none else 'NA' }}</td>
         {% endfor %}
-    </tr>
-    <tr>
-        {% endfor %}
-    </tr>
-    {% endfor %}
-</table>
+        </tbody>
+    </table>
 </div>
 </body>
 </html>
