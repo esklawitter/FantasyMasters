@@ -39,8 +39,8 @@ class PGADataExtractor(object):
             self.refresh_lock.acquire()
             response = self._pull_score_data()
             self._last_refresh = datetime.datetime.now()
-            self._results_timestamp = datetime.datetime.strptime(response['time_stamp'], '%Y%m%d%H%M%S')
-            debug('score timestamp is {}'.format(self._results_timestamp.strftime('%Y-%m-%d %H:%M:%S')))
+            self.results_timestamp = datetime.datetime.strptime(response['time_stamp'], '%Y%m%d%H%M%S')
+            debug('score timestamp is {}'.format(self.results_timestamp.strftime('%Y-%m-%d %H:%M:%S')))
             debug('parsing leaderboard')
 
             if self.field.par is None:
@@ -73,7 +73,7 @@ class PGADataExtractor(object):
         players = []
         for player_data in board['players']:
             self.field.upsert_golfer(player_data)
-        raw_board = pd.DataFrame([p.get_raw_score_dict() for p in self.field.golfers])
+        raw_board = pd.DataFrame([p.get_raw_score_dict() for p in self.field.golfers], columns=['player_id', 'first_name', 'last_name', 'status'] + ['round_' + str(i) for i in range(1,5)])
         return raw_board
         # for each player, push all rounds, normalized to par
         # then update with current round info

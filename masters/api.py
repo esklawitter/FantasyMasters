@@ -29,20 +29,21 @@ pga_extractor = PGADataExtractor(refresh_mutex)
 comp = Competition(pga_extractor.field, TEAMS_CSV, pga_extractor.defaults)
 
 
-@api.route("/{greeting}")
-async def greet_world(req, resp, *, greeting):
+@api.route('/')
+def greet_world(req, resp):
     refresh_mutex.acquire()
-    resp.text = f'Standings as of {pga_extractor._last_refresh}\n'
-
-    for team in comp.get_standings():
-        resp.text += f'{team.name} {team.get_score_with_defaults()}\n'
+    # resp.text = f'Standings as of {pga_extractor.results_timestamp}\n'
+    #
+    # for team in comp.get_standings():
+    #     resp.text += f'{team.name} {team.get_score_with_defaults()}\n'
+    resp.html = api.template('index.html', pga_extractor=pga_extractor, comp=comp)
     refresh_mutex.release()
 
 
 def app() -> None:
     data_update_thread = Thread(target=pga_extractor.start)
     data_update_thread.start()
-    api.run()
+    api.run(address='0.0.0.0', port=80)
     data_update_thread.join()
     return
 

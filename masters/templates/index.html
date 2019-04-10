@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
+      integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+<head>
+    <title>Fantasy Masters - 2019</title>
+</head>
+<body>
+<div id="Standings Timestamp"><h1>Standings as of: {{ pga_extractor.results_timestamp }}</h1></div>
+<div class="table-responsive">
+<table class="table">
+    <tr>
+        <th>Team</th>
+        <th>Score</th>
+        <th>Golfer</th>
+        <th>Status</th>
+        <th> Total</th>
+        <th>Thru/Next Tee</th>
+        <th>Round 1</th>
+        <th>Round 2</th>
+        <th>Round 3</th>
+        <th>Round 4</th>
+    </tr>
+    <tr>
+        <th colspan="6"> Penalty Scores
+        </th>
+        {% for pen in pga_extractor.defaults %}
+        <th> {{ pen }}</th>
+        {% endfor %}
+    </tr>
+    {% for team in comp.standings %}
+    <tr>
+        <td rowspan="5">{{ team.name }}</td>
+        <td rowspan="5">{{ team.score }}</td>
+        {% for player in team.players %}
+        <td>{{ player.first_name }} {{ player.last_name }}</td>
+        <td>{{ player.status }}</td>
+        <td>{{ player.get_score_or_default()[0] }}</td>
+        <td>{{ player.get_today() }}</td>
+        {% for round in player.rounds %}
+        <td>{{ round['score'] if round['score'] is not none else 'NA' }}</td>
+        {% endfor %}
+    </tr>
+    <tr>
+        {% endfor %}
+    </tr>
+    {% endfor %}
+</table>
+</div>
+</body>
+</html>

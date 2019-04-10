@@ -1,11 +1,12 @@
 from logging import error, warn, info, debug
 import pandas as pd
 import csv
+import datetime
 
 
 class Competition(object):
 
-    def __init__(self, field: list, team_filename: str, defaults:list):
+    def __init__(self, field: list, team_filename: str, defaults: list):
         # initializes a competition from a list of golfers and a path to a team name:team members file
         self.teams = []
         self.defaults = defaults
@@ -13,16 +14,18 @@ class Competition(object):
             reader = csv.reader(f)
             for line in reader:
                 info(f'initializing team: {line[0]}')
-                self.teams.append(FantasyTeam(line[0], [player.replace('-', ' ') for player in line[1:]], field, defaults))
+                self.teams.append(
+                    FantasyTeam(line[0], [player.replace('-', ' ') for player in line[1:]], field, defaults))
             info('All teams initialized')
         return
 
+    @property
+    def standings(self):
+        return self.get_standings()
 
     def get_standings(self):
         self.teams.sort(key=lambda team: team.score)
         return self.teams
-
-
 
 
 class FantasyTeam(object):
@@ -48,21 +51,19 @@ class FantasyTeam(object):
         scores = []
         team_score = 0
         for player in self.players:
-            total, penalty, rounds = player.get_score_or_default(self.defaults)
+            total, rounds = player.get_score_or_default()
             # replace all non-integers with default (withdrawn, cut)
             defaulted = [score if isinstance(score, int) else self.defaults[i] for i, score in enumerate(rounds)]
             scores.append(defaulted)
-        score_grid = pd.DataFrame(scores, columns = [str(i) for i in range(1,5)])
-        for i in range(1,3):
+        score_grid = pd.DataFrame(scores, columns=[str(i) for i in range(1, 5)])
+        for i in range(1, 3):
             team_score += score_grid[str(i)].sum()
-        for i in range (3, 5):
+        for i in range(3, 5):
             team_score += score_grid[str(i)].nsmallest(3).sum()
         return team_score
 
-
-
-
-
+    def get_scores_df(self):
+        return pd.DataFrame([golfer.get_raw_score_dict() for golfer in self.players])
 
 
 class Golfer(object):
@@ -81,39 +82,45 @@ class Golfer(object):
         self.status = raw['status']
 
         self.rounds = raw['rounds']
+        self.thru = raw['thru']
 
         for round in self.rounds:
             round['score'] = round['strokes'] - par if round['strokes'] else None
             if round['round_number'] == raw['current_round']:
                 round['score'] = raw['today']
 
-    def get_score_or_default(self, defaults):
-        #todo: refactor this to better align with access pattern (eg, no need for separate penalty)
+    def get_score_or_default(self):
+        # todo: refactor this to better align with access pattern (eg, no need for separate penalty)
         scores = [round['score'] if round['score'] else 0 for round in self.rounds]
 
         if self.status == 'active':
             score = sum(scores)
-            penalty = 0
         elif self.status == 'cut':
             score = self.rounds[0]['score'] + self.rounds[1]['score']
             scores[2] = 'cut'
             scores[3] = 'cut'
-            penalty = sum(defaults[2:3])
         elif self.status == 'wd':
             # todo calculate withdrawn round
             score = 0
             scores = ['wd'] * 4
-            penalty = sum(defaults)
         else:
             error(f'Unknown Player Status: {self.status}')
-        return score, penalty, scores
+        return score, scores
 
     def get_next_tee_time(self):
         if self.status in ('cut', 'wd'):
             return None
         for round in reversed(self.rounds):
             if round['tee_time'] is not None:
-                return round['tee_time']
+                return datetime.datetime.strptime(round['tee_time'], '%Y-%m-%dT%H:%M:%S')
+
+    def get_today(self):
+        if self.thru is not None and self.thru != 18:
+            return self.thru
+        elif self.get_next_tee_time() is not None:
+            return self.get_next_tee_time().strftime('%a %I:%M%p')
+        else:
+            return 'NA'
 
     def get_raw_score_dict(self):
         scores_dict = {'round_' + str(i + 1): round['score'] if round['score'] else 0 for i, round in
@@ -128,7 +135,7 @@ class Field(object):
         self.par = None
         self.golfers = []
 
-    def get_golfer_from_name(self, first, last, silent = False) -> Golfer:
+    def get_golfer_from_name(self, first, last, silent=False) -> Golfer:
         for player in self.golfers:
             if player.first_name.lower() == first.lower() and player.last_name.lower() == last.lower():
                 return player
@@ -137,7 +144,7 @@ class Field(object):
         return
 
     def upsert_golfer(self, player_info):
-        player= self.get_golfer_from_name(player_info['player_bio']['first_name'],
+        player = self.get_golfer_from_name(player_info['player_bio']['first_name'],
                                            player_info['player_bio']['last_name'], silent=True)
         if player:
             player.update(player_info, self.par)
