@@ -43,7 +43,7 @@ class FantasyTeam(object):
         # take list of players and list of identifiers to return list of references to players
         teammates = []
         for name in members:
-            name_parts = name.rsplit(' ', 1)
+            name_parts = name.split(' ', 1) if name != 'Si Woo Kim' else ['Si Woo', 'Kim']
             teammates.append(field.get_golfer_from_name(name_parts[0], name_parts[1]))
         return teammates
 
@@ -121,9 +121,11 @@ class Golfer(object):
     def get_next_tee_time(self):
         if self.status in ('cut', 'wd'):
             return None
-        for round in reversed(self.rounds):
+        times = []
+        for round in self.rounds:
             if round['tee_time'] is not None:
-                return datetime.datetime.strptime(round['tee_time'], '%Y-%m-%dT%H:%M:%S')
+                times.append(datetime.datetime.strptime(round['tee_time'], '%Y-%m-%dT%H:%M:%S'))
+        return min(times)
 
     def get_today(self):
         if self.thru is not None and self.thru != 18:

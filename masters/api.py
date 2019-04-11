@@ -5,7 +5,7 @@ from masters.models import Competition
 from threading import Thread, Lock
 
 TEAMS_CSV = 'teams.csv'
-TEAMS_CSV = 'test_teams.csv'
+#TEAMS_CSV = 'test_teams.csv'
 
 '''
     general architecture:
@@ -25,7 +25,7 @@ TEAMS_CSV = 'test_teams.csv'
 
 refresh_mutex = Lock()
 api = responder.API()
-pga_extractor = PGADataExtractor(refresh_mutex, tid='041')
+pga_extractor = PGADataExtractor(refresh_mutex)#, tid='041')
 comp = Competition(pga_extractor.field, TEAMS_CSV, pga_extractor.defaults)
 
 
