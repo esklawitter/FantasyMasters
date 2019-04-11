@@ -1,6 +1,5 @@
 import requests
 import datetime
-import dataset
 import pandas as pd
 from masters.models import Golfer, Field
 import copy
