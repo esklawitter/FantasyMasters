@@ -124,7 +124,9 @@ class Golfer(object):
         times = []
         for round in self.rounds:
             if round['tee_time'] is not None:
-                times.append(datetime.datetime.strptime(round['tee_time'], '%Y-%m-%dT%H:%M:%S'))
+                tee = datetime.datetime.strptime(round['tee_time'], '%Y-%m-%dT%H:%M:%S')
+                if (tee - datetime.datetime.now()).total_seconds() / 60.0 > 120:
+                    times.append(tee)
         return min(times)
 
     def get_today(self):
