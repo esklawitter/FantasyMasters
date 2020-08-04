@@ -2,6 +2,7 @@ from logging import error, warn, info, debug
 import pandas as pd
 import csv
 import datetime
+
 TEAM_SIZE = 5
 WEEKEND_TEAM_SIZE = 3
 SATURDAY_ROUND = 3
@@ -26,9 +27,10 @@ class Competition(object):
     def standings(self):
         return self.get_standings()
 
-
     def get_standings(self):
         self.teams.sort(key=lambda team: team.score)
+        for ix, team in enumerate(self.teams):
+            team.position = ix + 1
         return self.teams
 
 
@@ -42,6 +44,13 @@ class FantasyTeam(object):
     @property
     def score(self):
         return self.get_score_with_defaults()[0]
+
+    def get_pct_complete(self):
+        return 0.85
+
+    def get_pct_complete_str(self, width=0):
+        res = f'{self.get_pct_complete():10.0%}'
+        return ' ' * (width - len(res)) + res
 
     def _get_members_from_field(self, members: list, field: list):
         # take list of players and list of identifiers to return list of references to players
@@ -67,7 +76,8 @@ class FantasyTeam(object):
             scores.append(defaulted)
 
         for round_num in range(1, 5):
-            scores.sort(key=lambda x: x[round_num]['score'])  # this is ugly because player is the first item in the array
+            scores.sort(
+                key=lambda x: x[round_num]['score'])  # this is ugly because player is the first item in the array
             for player_ix in range(TEAM_SIZE if round_num < SATURDAY_ROUND else WEEKEND_TEAM_SIZE):
                 daily_scores[round_num - 1] += scores[player_ix][round_num]['score']
                 scores[player_ix][round_num]['counted'] = True
@@ -97,11 +107,17 @@ class Golfer(object):
         self.status = raw['status']
 
         self.rounds = raw['rounds']
-        self.thru = raw['thru']
+        self.thru = raw['thru'] if raw['thru'] != '' else None
+        self.tee_time = raw['teeTime']
+        self.position = raw['positionCurrent']
+        self.round_complete = raw['roundComplete']
+        raw_rank  = raw['projectedRanks']['cupRank']
+        self.rank = raw_rank if raw_rank else None
 
         for round in self.rounds:
-            round['score'] = int(round['strokes']) - par if round['strokes'] else None
-            if self._round_title_to_int(round['title']) == raw[ 'tournamentRoundId']:  # Todo: confirm that tournamentRoundId works as expected
+            round['score'] = int(round['strokes']) - par if round['strokes'] != '--' else None
+            if self._round_title_to_int(round['title']) == raw[
+                'tournamentRoundId']:  # Todo: confirm that tournamentRoundId works as expected
                 round['score'] = raw['today']
 
     def _round_title_to_int(self, round: str) -> int:
@@ -128,22 +144,13 @@ class Golfer(object):
     def get_next_tee_time(self):
         if self.status.lower() in ('cut', 'wd'):
             return None
-        times = []
-        # for round in self.rounds:
-        #     if round['tee_time'] is not None:
-        #         tee = datetime.datetime.strptime(round['tee_time'], '%Y-%m-%dT%H:%M:%S')
-        #         if (tee - datetime.datetime.now()).total_seconds() / 60.0 > -120:
-        #             times.append(tee)
-        # # return min(times) if any(times) else None
-        return None #todo figure out how this works with the new api
+        return self.tee_time  # todo figure out how this works with the new api
 
     def get_today(self):
-        if self.thru is not None and self.get_next_tee_time() is None:
-            return self.thru
-        elif self.get_next_tee_time() is not None:
-            return self.get_next_tee_time().strftime('%a %I:%M%p')
-        else:
+        if self.status.lower() in ('cut', 'wd'):
             return 'NA'
+        else:
+            return self.thru
 
     def get_raw_score_dict(self):
         scores_dict = {'round_' + str(i + 1): round['score'] if round['score'] else 0 for i, round in
@@ -163,7 +170,7 @@ class Field(object):
             if player.first_name.lower() == first.lower() and player.last_name.lower() == last.lower():
                 return player
         if not silent:
-            error(f"unable to find player: {first} {last}")
+            error(f"Unable to find player: {first} {last}")
         return
 
     def upsert_golfer(self, player_info):

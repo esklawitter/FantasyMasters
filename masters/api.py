@@ -55,11 +55,19 @@ def app() -> None:
 def set_up_logging() -> None:
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
+    exclude_loggers()
     handler = logging.StreamHandler(sys.stdout)
-    formatter = logging.Formatter('%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    formatter = logging.Formatter('%(asctime)s [%(levelname)7s] [%(name)10s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     handler.setFormatter(formatter)
     root.addHandler(handler)
     logging.debug('Logging Initialized')
+
+def exclude_loggers() -> None:
+    #todo migrate off the root logger
+    logging.getLogger('selenium').setLevel(logging.WARNING)
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger('parse').setLevel(logging.WARNING)
+
 
 
 if __name__ == '__main__':

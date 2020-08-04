@@ -29,7 +29,7 @@ class PGADataExtractor(object):
         self.course_info = self.get_course_info()
         self.field = Field(self.course_info.par)
         self.defaults = [0, 0, 0, 0]
-        self.tid = 476 #tid
+        self.tid = '033' #tid
         if self.tid is None:
             self.tid = self._get_active_tid()
 
@@ -37,6 +37,7 @@ class PGADataExtractor(object):
         self._last_refresh = datetime.datetime.now()
         self.refresh_freq = refresh_freq
         self._initialize_selenium()
+        self._refresh_token()
         self.refresh(force=True)
 
 
@@ -49,17 +50,18 @@ class PGADataExtractor(object):
 
     def refresh(self, force=False) -> dict:
         if force or (datetime.datetime.now() - self._last_refresh).total_seconds / 60.0 > self.refresh_freq:
+            debug('Refreshing leaderboard')
             self.refresh_lock.acquire()
             response = self._pull_score_data()
             self._last_refresh = datetime.datetime.now()
             self.results_timestamp = datetime.datetime.strptime(response['header']['lastUpdated'], '%Y-%m-%dT%H:%M:%S')
-            debug('score timestamp is {}'.format(self.results_timestamp.strftime('%Y-%m-%dT%H:%M:%S')))
-            debug('parsing leaderboard')
+            debug('Score timestamp is {}'.format(self.results_timestamp.strftime('%Y-%m-%dT%H:%M:%S')))
+            debug('Parsing leaderboard')
 
             self.raw_leaderboard = self._compose_raw_board(response)
             self._calculate_defaults(self.raw_leaderboard)
             self.refresh_lock.release()
-            debug('done parsing leaderboard')
+            debug('Done parsing leaderboard')
             return
 
     def _calculate_defaults(self, leaderboard: pd.DataFrame):
@@ -89,8 +91,14 @@ class PGADataExtractor(object):
         # then update with current round info
 
     def _pull_score_data(self) -> dict:
-        response = self._do_get_request(URL_LEADERBOARD.format(self.tid, self._get_token()))
-        return response.json()
+        try:
+            response = self._do_get_request(URL_LEADERBOARD.format(self.tid, self.latest_token))
+            return response.json()
+        except Exception as e:
+            debug('Token expired.')
+            self._refresh_token()
+            self._pull_score_data()
+
 
     def _get_active_tid(self) -> str:
         response = self._do_get_request(URL_CURRENT_TID)
@@ -99,7 +107,7 @@ class PGADataExtractor(object):
         return tid
 
     def _do_get_request(self, url: str) -> object:
-        debug(f'get request to: {url}')
+        debug(f'Get request to: {url}')
         response = requests.get(url)
         response.raise_for_status()
         return response
@@ -109,24 +117,26 @@ class PGADataExtractor(object):
         caps['goog:loggingPrefs'] = {'performance': 'ALL'}
         self.driver = webdriver.Chrome(desired_capabilities=caps)
 
-    def _get_token(self) -> str:
+    def _refresh_token(self) -> str:
+        debug('Refreshing token')
         self.driver.get(URL_PUBLIC_LEADERBOARD)
         browser_log = self.driver.get_log('performance')
         events = [json.loads(entry['message'])['message'] for entry in browser_log]
-        token = None
+        refreshed = False
         for event in events:
             if 'Network.response' in event['method']:
                 try:
                     url = event['params']['response']['url']
                     if 'userTrackingId' in url:
-                        token = url.split('userTrackingId=')[1]
+                        self.latest_token = url.split('userTrackingId=')[1]
+                        refreshed = True
                 except KeyError:
                     pass
-        if not token:
+        if not refreshed:
+            warn('Token refresh failed')
             time.sleep(1)
-            return self._get_token()
-            # raise ValueError('Unable to get PGA session token')
-        return token
+            self._refresh_token()
+
 
     def get_course_info(self) -> CourseInfo:
         course_info = self._do_get_request(URL_COURSE_INFO).json()['courses'][0]

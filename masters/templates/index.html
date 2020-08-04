@@ -20,6 +20,24 @@ tr.collapse.in {
 text-align:center;
 }
 
+td{
+text-align:center;
+}
+
+th{
+text-align:center;
+}
+
+.right{
+text-align:right;
+}
+
+.left{
+text-align:left;
+}
+
+
+
 
 </style>
 
@@ -31,10 +49,12 @@ text-align:center;
     <table class="table table-striped table-hover">
         <thead class="thead-dark">
         <tr>
-            <th>Golfer</th>
+            <th class="left">Golfer</th>
+            <th>Position</th>
             <th>Status</th>
-            <th> Total</th>
-            <th>Thru/Next Tee</th>
+            <th>Next Tee</th>
+            <th>Total</th>
+            <th>Thru</th>
             <th class="score">Round 1</th>
             <th class="score">Round 2</th>
             <th class="score">Round 3</th>
@@ -44,18 +64,22 @@ text-align:center;
         <tbody>
         {% for team in comp.standings %}
         <tr data-toggle="collapse" data-target=".{{ team.name }}" class="table-primary">
-            <th>{{ team.name }}</th>
-            <th>Total Score:</th>
+            <th class="left">{{ team.name }}</th>
+            <th>{{ team.position }}</th>
+            <th></th>
+            <th></th>
             <th>{{ team.add_plus(team.score) }}</th>
-            <th>Daily Totals</th>
+            <th>{{ team.get_pct_complete_str() }}</th>
             {% for day in team.get_score_with_defaults()[2] %}
             <th class="score">{{ team.add_plus(day) }}</th>
             {% endfor %}
         </tr>
         {% for player in team.get_score_with_defaults()[1] %}
         <tr class="collapse {{ team.name }}">
-            <td class>{{ player[0].first_name }} {{ player[0].last_name }}</td>
+            <td class="left">{{ player[0].first_name }} {{ player[0].last_name }}</td>
+            <td class="score">{{ player[0].position }}</td>
             <td>{{ player[0].status.capitalize() }}</td>
+            <td>{{ player[0].get_next_tee_time() }}</td>
             <td>{{ team.add_plus(player[0].get_score_or_default()[0]) }}</td>
             <td>{{ player[0].get_today() }}</td>
             {% for round in player[1:] %}
