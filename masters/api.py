@@ -1,11 +1,14 @@
-import responder
 import logging
-from masters.livedata import PGADataExtractor
-from masters.models import Competition
+import sys
 from threading import Thread, Lock
 
-TEAMS_CSV = 'teams.csv'
-#TEAMS_CSV = 'test_teams.csv'
+import responder
+
+from masters.livedata import PGADataExtractor
+from masters.models import Competition
+
+TEAMS_CSV = 'test_teams.csv'
+# TEAMS_CSV = 'test_teams.csv'
 
 '''
     general architecture:
@@ -25,29 +28,40 @@ TEAMS_CSV = 'teams.csv'
 
 refresh_mutex = Lock()
 api = responder.API()
-pga_extractor = PGADataExtractor(refresh_mutex)#, tid='041')
-comp = Competition(pga_extractor.field, TEAMS_CSV, pga_extractor.defaults)
+pga_extractor = None
+comp = None
 
 
 @api.route('/')
 def greet_world(req, resp):
     refresh_mutex.acquire()
-    # resp.text = f'Standings as of {pga_extractor.results_timestamp}\n'
-    #
-    # for team in comp.get_standings():
-    #     resp.text += f'{team.name} {team.get_score_with_defaults()}\n'
+    comp.get_standings()
     resp.html = api.template('index.html', pga_extractor=pga_extractor, comp=comp)
     refresh_mutex.release()
 
 
 def app() -> None:
+    global pga_extractor
+    global comp
+    pga_extractor = PGADataExtractor(refresh_mutex)  # , tid='041')
+    comp = Competition(pga_extractor.field, TEAMS_CSV, pga_extractor.defaults)
     data_update_thread = Thread(target=pga_extractor.start)
     data_update_thread.start()
-    api.run(address='0.0.0.0', port=80)
+    api.run(address='0.0.0.0', port=2577)
     data_update_thread.join()
     return
 
 
+def set_up_logging() -> None:
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter('%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    handler.setFormatter(formatter)
+    root.addHandler(handler)
+    logging.debug('Logging Initialized')
+
+
 if __name__ == '__main__':
-    logging.basicConfig(level='DEBUG', format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
+    set_up_logging()
     app()

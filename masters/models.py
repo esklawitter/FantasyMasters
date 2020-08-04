@@ -2,6 +2,9 @@ from logging import error, warn, info, debug
 import pandas as pd
 import csv
 import datetime
+TEAM_SIZE = 5
+WEEKEND_TEAM_SIZE = 3
+SATURDAY_ROUND = 3
 
 
 class Competition(object):
@@ -22,6 +25,7 @@ class Competition(object):
     @property
     def standings(self):
         return self.get_standings()
+
 
     def get_standings(self):
         self.teams.sort(key=lambda team: team.score)
@@ -62,12 +66,12 @@ class FantasyTeam(object):
                     'undef_str': score, 'counted': False, 'is_penalty': True} for i, score in enumerate(rounds)]
             scores.append(defaulted)
 
-        for i in range(1, 5):
-            scores.sort(key=lambda x: x[i]['score'])  # this is ugly because player is the first item in the array
-            for j in range(5 if i < 3 else 3):
-                daily_scores[i - 1] += scores[j][i]['score']
-                scores[j][i]['counted'] = True
-            team_score += daily_scores[i - 1]
+        for round_num in range(1, 5):
+            scores.sort(key=lambda x: x[round_num]['score'])  # this is ugly because player is the first item in the array
+            for player_ix in range(TEAM_SIZE if round_num < SATURDAY_ROUND else WEEKEND_TEAM_SIZE):
+                daily_scores[round_num - 1] += scores[player_ix][round_num]['score']
+                scores[player_ix][round_num]['counted'] = True
+            team_score += daily_scores[round_num - 1]
         return team_score, scores, daily_scores
 
     def get_scores_df(self):
@@ -86,9 +90,9 @@ class Golfer(object):
         self.update(raw, par)
 
     def update(self, raw, par):
-        self.player_id = raw['player_id']
-        self.first_name = raw['player_bio']['first_name']
-        self.last_name = raw['player_bio']['last_name']
+        self.player_id = raw['playerId']
+        self.first_name = raw['playerNames']['firstName']
+        self.last_name = raw['playerNames']['lastName']
 
         self.status = raw['status']
 
@@ -96,9 +100,12 @@ class Golfer(object):
         self.thru = raw['thru']
 
         for round in self.rounds:
-            round['score'] = round['strokes'] - par if round['strokes'] else None
-            if round['round_number'] == raw['current_round']:
+            round['score'] = int(round['strokes']) - par if round['strokes'] else None
+            if self._round_title_to_int(round['title']) == raw[ 'tournamentRoundId']:  # Todo: confirm that tournamentRoundId works as expected
                 round['score'] = raw['today']
+
+    def _round_title_to_int(self, round: str) -> int:
+        return int(round.replace('r', ''))
 
     def get_score_or_default(self):
         # todo: refactor this to better align with access pattern (eg, no need for separate penalty)
@@ -119,18 +126,19 @@ class Golfer(object):
         return score, scores
 
     def get_next_tee_time(self):
-        if self.status in ('cut', 'wd'):
+        if self.status.lower() in ('cut', 'wd'):
             return None
         times = []
-        for round in self.rounds:
-            if round['tee_time'] is not None:
-                tee = datetime.datetime.strptime(round['tee_time'], '%Y-%m-%dT%H:%M:%S')
-                if (tee - datetime.datetime.now()).total_seconds() / 60.0 > 120:
-                    times.append(tee)
-        return min(times)
+        # for round in self.rounds:
+        #     if round['tee_time'] is not None:
+        #         tee = datetime.datetime.strptime(round['tee_time'], '%Y-%m-%dT%H:%M:%S')
+        #         if (tee - datetime.datetime.now()).total_seconds() / 60.0 > -120:
+        #             times.append(tee)
+        # # return min(times) if any(times) else None
+        return None #todo figure out how this works with the new api
 
     def get_today(self):
-        if self.thru is not None and self.thru != 18:
+        if self.thru is not None and self.get_next_tee_time() is None:
             return self.thru
         elif self.get_next_tee_time() is not None:
             return self.get_next_tee_time().strftime('%a %I:%M%p')
@@ -146,8 +154,8 @@ class Golfer(object):
 
 
 class Field(object):
-    def __init__(self):
-        self.par = None
+    def __init__(self, par):
+        self.par = par
         self.golfers = []
 
     def get_golfer_from_name(self, first, last, silent=False) -> Golfer:
@@ -159,10 +167,11 @@ class Field(object):
         return
 
     def upsert_golfer(self, player_info):
-        player = self.get_golfer_from_name(player_info['player_bio']['first_name'],
-                                           player_info['player_bio']['last_name'], silent=True)
+        player = self.get_golfer_from_name(player_info['playerNames']['firstName'],
+                                           player_info['playerNames']['lastName'], silent=True)
         if player:
             player.update(player_info, self.par)
         else:
-            self.golfers.append(Golfer(player_info, self.par))
+            player = Golfer(player_info, self.par)
+            self.golfers.append(player)
         return player
