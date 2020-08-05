@@ -97,7 +97,7 @@ class PGADataExtractor(object):
         except Exception as e:
             debug('Token expired.')
             self._refresh_token()
-            self._pull_score_data()
+            return self._pull_score_data()
 
 
     def _get_active_tid(self) -> str:

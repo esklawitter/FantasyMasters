@@ -1,11 +1,23 @@
-from logging import error, warn, info, debug
-import pandas as pd
 import csv
-import datetime
+from logging import error, info
 
-TEAM_SIZE = 5
-WEEKEND_TEAM_SIZE = 3
+import pandas as pd
+
+TEAM_SIZE = 6
+WEEKEND_TEAM_SIZE = 4
 SATURDAY_ROUND = 3
+
+
+def str_to_int(val: str, none_is_zero=True):
+    # convenience function to strip down to raw integer
+    digits = ''.join(c for c in val if c.isdigit())
+    if digits:
+        return int(digits)
+    else:
+        if none_is_zero:
+            return 0
+        else:
+            return None
 
 
 class Competition(object):
@@ -19,7 +31,7 @@ class Competition(object):
             for line in reader:
                 info(f'initializing team: {line[0]}')
                 self.teams.append(
-                    FantasyTeam(line[0], [player.replace('-', ' ') for player in line[1:]], field, defaults))
+                    FantasyTeam(line[0], line[1:], field, defaults))
             info('All teams initialized')
         return
 
@@ -29,9 +41,26 @@ class Competition(object):
 
     def get_standings(self):
         self.teams.sort(key=lambda team: team.score)
-        for ix, team in enumerate(self.teams):
-            team.position = ix + 1
+        self._calculate_positions()
+
         return self.teams
+
+    def _calculate_positions(self):
+        scores = [team.score for team in self.teams]
+        scores_df = pd.DataFrame(scores, columns=['score'])
+        grouped_scores = scores_df.groupby('score', sort=True)
+        score_rank_map = {}
+        ix = 1
+        for score, teams in grouped_scores:
+            num_teams = len(teams)
+            if num_teams > 1:
+                score_rank_map[score] = f'T{ix}'
+            else:
+                score_rank_map[score] = str(ix)
+            ix += num_teams
+        for team in self.teams:
+            team.position = score_rank_map[team.score]
+        return
 
 
 class FantasyTeam(object):
@@ -46,7 +75,15 @@ class FantasyTeam(object):
         return self.get_score_with_defaults()[0]
 
     def get_pct_complete(self):
-        return 0.85
+        par = 72.0 * 4  # todo resolve this
+        total = 0
+        for player in self.players:
+            if player.is_active():
+                if player.round_complete:
+                    total += 18
+                else:
+                    total += str_to_int(player.thru)
+        return total / par
 
     def get_pct_complete_str(self, width=0):
         res = f'{self.get_pct_complete():10.0%}'
@@ -56,7 +93,7 @@ class FantasyTeam(object):
         # take list of players and list of identifiers to return list of references to players
         teammates = []
         for name in members:
-            name_parts = name.split(' ', 1) if name != 'Si Woo Kim' else ['Si Woo', 'Kim']
+            name_parts = name.split(' ', 1) if name != 'Byeong Hun An' else ['Byeong Hun', 'An']
             teammates.append(field.get_golfer_from_name(name_parts[0], name_parts[1]))
         return teammates
 
@@ -84,10 +121,10 @@ class FantasyTeam(object):
             team_score += daily_scores[round_num - 1]
         return team_score, scores, daily_scores
 
-    def get_scores_df(self):
+    def get_scores_df(self) -> pd.DataFrame:
         return pd.DataFrame([golfer.get_raw_score_dict() for golfer in self.players])
 
-    def add_plus(self, score):
+    def add_plus(self, score: int):
         return f'+{score}' if score >= 0 else f'{score}'
 
 
@@ -111,7 +148,7 @@ class Golfer(object):
         self.tee_time = raw['teeTime']
         self.position = raw['positionCurrent']
         self.round_complete = raw['roundComplete']
-        raw_rank  = raw['projectedRanks']['cupRank']
+        raw_rank = raw['projectedRanks']['cupRank']
         self.rank = raw_rank if raw_rank else None
 
         for round in self.rounds:
@@ -142,15 +179,21 @@ class Golfer(object):
         return score, scores
 
     def get_next_tee_time(self):
-        if self.status.lower() in ('cut', 'wd'):
+        if not self.is_active():
             return None
         return self.tee_time  # todo figure out how this works with the new api
 
     def get_today(self):
-        if self.status.lower() in ('cut', 'wd'):
-            return 'NA'
-        else:
+        if self.is_active():
             return self.thru
+        else:
+            return 'NA'
+
+    def is_active(self):
+        if self.status.lower() in ('cut', 'wd'):
+            return False
+        else:
+            return True
 
     def get_raw_score_dict(self):
         scores_dict = {'round_' + str(i + 1): round['score'] if round['score'] else 0 for i, round in

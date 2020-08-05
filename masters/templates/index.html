@@ -9,7 +9,16 @@
 <head>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script src="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
-    <title>Fantasy Masters - 2019</title>
+    <title>Fantasy Golf</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+    <link rel="manifest" href="/static/site.webmanifest">
+    <link rel="mask-icon" href="/static/safari-pinned-tab.svg" color="#5bbad5">
+    <link rel="shortcut icon" href="/static/favicon.ico">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="msapplication-config" content="/static/browserconfig.xml">
+    <meta name="theme-color" content="#b8daff">
 </head>
 <style>
 tr.collapse.in {
@@ -34,7 +43,10 @@ text-align:right;
 
 .left{
 text-align:left;
+width:20%;
 }
+
+
 
 
 
@@ -43,7 +55,7 @@ text-align:left;
 
 <body>
 <div id="Standings Timestamp">
-    <h1 class="display-2"> Fantasy PGA Championship 2020</h1>
+    <h1 class="display-2">PGA Championship 2020</h1>
     <h3>Standings as of: {{ pga_extractor.results_timestamp.strftime('%a %I:%M%p') }}</h3></div>
 <div>
     <table class="table table-striped table-hover">
@@ -55,10 +67,10 @@ text-align:left;
             <th>Next Tee</th>
             <th>Total</th>
             <th>Thru</th>
-            <th class="score">Round 1</th>
-            <th class="score">Round 2</th>
-            <th class="score">Round 3</th>
-            <th class="score">Round 4</th>
+            <th class="score">R1</th>
+            <th class="score">R2</th>
+            <th class="score">R3</th>
+            <th class="score">R4</th>
         </tr>
         </thead>
         <tbody>
