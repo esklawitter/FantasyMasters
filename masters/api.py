@@ -40,6 +40,13 @@ def greet_world(req, resp):
     resp.html = api.template('index.html', pga_extractor=pga_extractor, comp=comp)
     refresh_mutex.release()
 
+@api.route('/prop.html')
+def greet_world(req, resp):
+    refresh_mutex.acquire()
+    comp.get_standings()
+    resp.html = api.template('prop.html', pga_extractor=pga_extractor, comp=comp)
+    refresh_mutex.release()
+
 
 def app(port) -> None:
     global pga_extractor

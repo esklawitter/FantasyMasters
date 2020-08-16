@@ -1,5 +1,6 @@
 import csv
 from logging import error, info
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -39,6 +40,12 @@ class Competition(object):
     def standings(self):
         return self.get_standings()
 
+    def get_team_by_name(self, team_name:str):
+        for team in self.teams:
+            if team.name == team_name:
+                return team
+        raise KeyError(f'Unable to find team in competition with name: {team_name}')
+
     def get_standings(self):
         self.teams.sort(key=lambda team: team.score)
         self._calculate_positions()
@@ -74,8 +81,9 @@ class FantasyTeam(object):
     def score(self):
         return self.get_score_with_defaults()[0]
 
+
     def get_pct_complete(self):
-        par = 72.0 * 4  # todo resolve this
+        par = 18.0 * 6  # todo resolve this
         total = 0
         for player in self.players:
             if player.is_active():
@@ -84,6 +92,11 @@ class FantasyTeam(object):
                 else:
                     total += str_to_int(player.thru)
         return total / par
+
+    def get_overall_golfer_standings(self):
+        self.players.sort(key=lambda x: int(x.position.replace('T', '')) if x.position != '--' else 9999)
+        return self.players
+
 
     def get_pct_complete_str(self, width=0):
         res = f'{self.get_pct_complete():10.0%}'
@@ -125,7 +138,12 @@ class FantasyTeam(object):
         return pd.DataFrame([golfer.get_raw_score_dict() for golfer in self.players])
 
     def add_plus(self, score: int):
-        return f'+{score}' if score >= 0 else f'{score}'
+        if score > 0:
+            return f'+{score}'
+        elif score == 0:
+            return 'E'
+        else:
+            return f'{score}'
 
 
 class Golfer(object):
@@ -137,6 +155,7 @@ class Golfer(object):
         self.update(raw, par)
 
     def update(self, raw, par):
+        self.raw = raw
         self.player_id = raw['playerId']
         self.first_name = raw['playerNames']['firstName']
         self.last_name = raw['playerNames']['lastName']
@@ -150,12 +169,12 @@ class Golfer(object):
         self.round_complete = raw['roundComplete']
         raw_rank = raw['projectedRanks']['cupRank']
         self.rank = raw_rank if raw_rank else None
+        self.total = raw['total']
 
         for round in self.rounds:
             round['score'] = int(round['strokes']) - par if round['strokes'] != '--' else None
-            if self._round_title_to_int(round['title']) == raw[
-                'tournamentRoundId']:  # Todo: confirm that tournamentRoundId works as expected
-                round['score'] = raw['today']
+            if self._round_title_to_int(round['title']) == int(raw[ 'tournamentRoundId']):  # Todo: confirm that tournamentRoundId works as expected
+                round['score'] = self.to_score(raw['round']) if raw['round'] != '--' else round['score']
 
     def _round_title_to_int(self, round: str) -> int:
         return int(round.replace('r', ''))
@@ -170,10 +189,10 @@ class Golfer(object):
             score = self.rounds[0]['score'] + self.rounds[1]['score']
             scores[2] = 'cut'
             scores[3] = 'cut'
-        elif self.status == 'wd':
+        elif self.status in ('wd', 'dq'):
             # todo calculate withdrawn round
             score = 0
-            scores = ['wd'] * 4
+            scores = [self.status] * 4
         else:
             error(f'Unknown Player Status: {self.status}')
         return score, scores
@@ -181,7 +200,13 @@ class Golfer(object):
     def get_next_tee_time(self):
         if not self.is_active():
             return None
-        return self.tee_time  # todo figure out how this works with the new api
+        if not self.tee_time:
+            return 'NA'
+        else:
+            tee_time, asterisk = (self.tee_time[:-1], '*') if self.tee_time[-1] == '*' else (self.tee_time, '')
+            shifted_time = datetime.strptime(tee_time, '%I:%M%p') + timedelta(hours=3)
+
+            return shifted_time.strftime('%I:%M%p').lstrip('0') + asterisk
 
     def get_today(self):
         if self.is_active():
@@ -190,7 +215,7 @@ class Golfer(object):
             return 'NA'
 
     def is_active(self):
-        if self.status.lower() in ('cut', 'wd'):
+        if self.status.lower() in ('cut', 'wd', 'dq'):
             return False
         else:
             return True
@@ -201,6 +226,12 @@ class Golfer(object):
         info_dict = {'player_id': self.player_id, 'first_name': self.first_name, 'last_name': self.last_name,
                      'status': self.status}
         return {**info_dict, **scores_dict}
+
+    def to_score(self, score):
+        if score and score != '--' and score != 'E':
+            return int(score)
+        else:
+            return 0
 
 
 class Field(object):

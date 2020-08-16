@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
+      integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+
+<!-- Latest compiled and minified JavaScript -->
+
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+    <title>Fantasy Golf</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+    <link rel="manifest" href="/static/site.webmanifest">
+    <link rel="mask-icon" href="/static/safari-pinned-tab.svg" color="#5bbad5">
+    <link rel="shortcut icon" href="/static/favicon.ico">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="msapplication-config" content="/static/browserconfig.xml">
+    <meta name="theme-color" content="#b8daff">
+</head>
+<style>
+tr.collapse.in {
+  display:table-row;
+}
+
+.score{
+text-align:center;
+}
+
+td{
+text-align:center;
+}
+
+th{
+text-align:center;
+}
+
+.right{
+text-align:right;
+}
+
+.left{
+text-align:left;
+width:20%;
+}
+
+
+
+.card-container{
+padding:10px;
+}
+
+
+
+</style>
+
+<body>
+<div id="Standings Timestamp">
+    <h1 class="display-2">PGA Championship 2020</h1>
+    <h1> Prop Bets</h1>
+    <h3><a href="/">Back to Leaderboard</a></h3>
+    <h3>Standings as of: {{ pga_extractor.results_timestamp.strftime('%a %I:%M%p') }}</h3></div>
+<div class="card-container">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Eric #4 vs Ryan #4</h5>
+            <h6 class="card-subtitle mb-2 text-muted">Wager: $1.00</h6>
+            <table class="table">
+                <tr>
+                    <th scope="col">
+                        Team
+                    </th>
+                    <th scope="col">
+                        Golfer
+                    </th>
+                    <th scope="col">
+                        Status
+                    </th>
+                    <th scope="col">Position</th>
+                    <th scope="col">
+                        Score
+                    </th>
+                    <th scope="col">
+                        Thru
+                    </th>
+                </tr>
+                <tr>
+                    <td>Eric</td>
+                    {% set golfer =comp.get_team_by_name('Eric').get_overall_golfer_standings()[3] %}
+                    <td>{{ golfer.first_name }} {{ golfer.last_name }}</td>
+                    <td>{{ golfer.status.capitalize() }}</td>
+                    <td>{{ golfer.position }}</td>
+                    <td>{{ golfer.total }}</td>
+                    <td>{{ golfer.thru }}</td>
+
+                </tr>
+                <tr>
+                    <td>Ryan</td>
+                    {% set golfer =comp.get_team_by_name('Ryan').get_overall_golfer_standings()[3] %}
+                    <td>{{ golfer.first_name }} {{ golfer.last_name }}</td>
+                    <td>{{ golfer.status.capitalize() }}</td>
+                    <td>{{ golfer.position }}</td>
+                    <td>{{ golfer.total }}</td>
+                    <td>{{ golfer.thru }}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -57,6 +57,7 @@ class PGADataExtractor(object):
             self.results_timestamp = datetime.datetime.strptime(response['header']['lastUpdated'], '%Y-%m-%dT%H:%M:%S')
             debug('Score timestamp is {}'.format(self.results_timestamp.strftime('%Y-%m-%dT%H:%M:%S')))
             debug('Parsing leaderboard')
+            self.cut_line = response['cutLines'][0]['cut_line_score']
 
             self.raw_leaderboard = self._compose_raw_board(response)
             self._calculate_defaults(self.raw_leaderboard)
@@ -139,9 +140,11 @@ class PGADataExtractor(object):
 
 
     def get_course_info(self) -> CourseInfo:
+        #Todo this is broken, need to infer par
         course_info = self._do_get_request(URL_COURSE_INFO).json()['courses'][0]
         holes = [Hole(int(hole['number']), int(hole['parValue']), int(hole['yards']), hole['body']) for hole in course_info['holes']]
-        course_info = CourseInfo(course_info['name'], int(course_info['parValue']), holes)
+        course_info = CourseInfo(course_info['name'], 70, #int(course_info['parValue']),
+                                 holes)
         debug(f'Course Name: {course_info.name}. Par: {course_info.par}.')
         return course_info
 
