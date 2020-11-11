@@ -1,26 +1,28 @@
-import requests
 import datetime
-import pandas as pd
-from masters.models import Golfer, Field
 import json
-import copy
-from logging import debug, info, warn, error
-import math
+import logging
 import time
+from collections import namedtuple
+
+import math
+import pandas as pd
+import requests
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-from collections import namedtuple
-import time
+
+from masters.models import Field
+
+logger = logging.getLogger(__name__)
 
 URL_PUBLIC_LEADERBOARD = 'https://www.pgatour.com/leaderboard.html'
+# TODO add TID and tour year resolution
 URL_CURRENT_TID = 'https://statdata.pgatour.com/r/current/message.json'
-URL_LEADERBOARD = 'https://lbdata.pgatour.com/2020/r/{}/leaderboard.json?userTrackingId={}'
+URL_LEADERBOARD = 'https://lbdata.pgatour.com/2021/r/{}/leaderboard.json?userTrackingId={}'
 URL_COURSE_INFO = 'https://www.pgatour.com/content/dam/pgatour/json/tournament/course.json'
 MAX_SCORE = 9999999
 
 CourseInfo = namedtuple('CourseInfo', ['name', 'par', 'holes'])
 Hole = namedtuple('Hole', ['number', 'par', 'yards', 'description'])
-
 
 
 class PGADataExtractor(object):
@@ -29,19 +31,18 @@ class PGADataExtractor(object):
         self.course_info = self.get_course_info()
         self.field = Field(self.course_info.par)
         self.defaults = [0, 0, 0, 0]
-        self.tid = '033' #tid
+        self.tid = '014'  # tid
         if self.tid is None:
             self.tid = self._get_active_tid()
-
 
         self._last_refresh = datetime.datetime.now()
         self.refresh_freq = refresh_freq
         self._initialize_selenium()
         self._refresh_token()
+        time.sleep(3)
         self.refresh(force=True)
 
-
-        info(f'PGADataExtractor initialized with TID: {self.tid}')
+        logger.info(f'PGADataExtractor initialized with TID: {self.tid}')
 
     def start(self):
         while (True):
@@ -50,19 +51,19 @@ class PGADataExtractor(object):
 
     def refresh(self, force=False) -> dict:
         if force or (datetime.datetime.now() - self._last_refresh).total_seconds / 60.0 > self.refresh_freq:
-            debug('Refreshing leaderboard')
+            logger.debug('Refreshing leaderboard')
             self.refresh_lock.acquire()
             response = self._pull_score_data()
             self._last_refresh = datetime.datetime.now()
             self.results_timestamp = datetime.datetime.strptime(response['header']['lastUpdated'], '%Y-%m-%dT%H:%M:%S')
-            debug('Score timestamp is {}'.format(self.results_timestamp.strftime('%Y-%m-%dT%H:%M:%S')))
-            debug('Parsing leaderboard')
+            logger.debug('Score timestamp is {}'.format(self.results_timestamp.strftime('%Y-%m-%dT%H:%M:%S')))
+            logger.debug('Parsing leaderboard')
             self.cut_line = response['cutLines'][0]['cut_line_score']
 
             self.raw_leaderboard = self._compose_raw_board(response)
             self._calculate_defaults(self.raw_leaderboard)
             self.refresh_lock.release()
-            debug('Done parsing leaderboard')
+            logger.debug('Done parsing leaderboard')
             return
 
     def _calculate_defaults(self, leaderboard: pd.DataFrame):
@@ -96,19 +97,18 @@ class PGADataExtractor(object):
             response = self._do_get_request(URL_LEADERBOARD.format(self.tid, self.latest_token))
             return response.json()
         except Exception as e:
-            debug('Token expired.')
+            logger.debug('Token expired.')
             self._refresh_token()
             return self._pull_score_data()
-
 
     def _get_active_tid(self) -> str:
         response = self._do_get_request(URL_CURRENT_TID)
         tid = response.json()['tid']
-        info(f'Active TID: {tid}')
+        logger.info(f'Active TID: {tid}')
         return tid
 
     def _do_get_request(self, url: str) -> object:
-        debug(f'Get request to: {url}')
+        logger.debug(f'Get request to: {url}')
         response = requests.get(url)
         response.raise_for_status()
         return response
@@ -119,7 +119,7 @@ class PGADataExtractor(object):
         self.driver = webdriver.Chrome(desired_capabilities=caps)
 
     def _refresh_token(self) -> str:
-        debug('Refreshing token')
+        logger.debug('Refreshing token')
         self.driver.get(URL_PUBLIC_LEADERBOARD)
         browser_log = self.driver.get_log('performance')
         events = [json.loads(entry['message'])['message'] for entry in browser_log]
@@ -134,17 +134,16 @@ class PGADataExtractor(object):
                 except KeyError:
                     pass
         if not refreshed:
-            warn('Token refresh failed')
+            logger.warn('Token refresh failed')
             time.sleep(1)
             self._refresh_token()
 
-
     def get_course_info(self) -> CourseInfo:
-        #Todo this is broken, need to infer par
+        # Todo this is broken, need to infer par
         course_info = self._do_get_request(URL_COURSE_INFO).json()['courses'][0]
-        holes = [Hole(int(hole['number']), int(hole['parValue']), int(hole['yards']), hole['body']) for hole in course_info['holes']]
-        course_info = CourseInfo(course_info['name'], 70, #int(course_info['parValue']),
+        holes = [Hole(int(hole['number']), int(hole['parValue']), int(hole['yards']), hole['body']) for hole in
+                 course_info['holes']]
+        course_info = CourseInfo(course_info['name'], 70,  # int(course_info['parValue']),
                                  holes)
-        debug(f'Course Name: {course_info.name}. Par: {course_info.par}.')
+        logger.debug(f'Course Name: {course_info.name}. Par: {course_info.par}.')
         return course_info
-

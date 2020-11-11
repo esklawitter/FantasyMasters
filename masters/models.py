@@ -1,24 +1,20 @@
 import csv
-from logging import error, info
 from datetime import datetime, timedelta
+import logging
 
 import pandas as pd
 
-TEAM_SIZE = 6
-WEEKEND_TEAM_SIZE = 4
+from masters.util import str_to_int, round_title_to_int, to_score
+
+logger = logging.getLogger(__name__)
+TEAM_SIZE = 5
+WEEKEND_TEAM_SIZE = 3
 SATURDAY_ROUND = 3
 
-
-def str_to_int(val: str, none_is_zero=True):
-    # convenience function to strip down to raw integer
-    digits = ''.join(c for c in val if c.isdigit())
-    if digits:
-        return int(digits)
-    else:
-        if none_is_zero:
-            return 0
-        else:
-            return None
+NAME_OVERRIDE_MAP = {
+    'Byeong Hun An': ['Byeong Hun', 'An'],
+    'Si Woo Kim': ['Si Woo', 'Kim']
+}
 
 
 class Competition(object):
@@ -30,17 +26,16 @@ class Competition(object):
         with open(team_filename) as f:
             reader = csv.reader(f)
             for line in reader:
-                info(f'initializing team: {line[0]}')
-                self.teams.append(
-                    FantasyTeam(line[0], line[1:], field, defaults))
-            info('All teams initialized')
+                logger.info(f'initializing team: {line[0]}')
+                self.teams.append(FantasyTeam(line[0], line[1:], field, defaults))
+            logger.info('All teams initialized')
         return
 
     @property
     def standings(self):
         return self.get_standings()
 
-    def get_team_by_name(self, team_name:str):
+    def get_team_by_name(self, team_name: str):
         for team in self.teams:
             if team.name == team_name:
                 return team
@@ -70,82 +65,6 @@ class Competition(object):
         return
 
 
-class FantasyTeam(object):
-
-    def __init__(self, team_name: str, members: list, field: list, defaults):
-        self.name = team_name
-        self.defaults = defaults
-        self.players = self._get_members_from_field(members, field)
-
-    @property
-    def score(self):
-        return self.get_score_with_defaults()[0]
-
-
-    def get_pct_complete(self):
-        par = 18.0 * 6  # todo resolve this
-        total = 0
-        for player in self.players:
-            if player.is_active():
-                if player.round_complete:
-                    total += 18
-                else:
-                    total += str_to_int(player.thru)
-        return total / par
-
-    def get_overall_golfer_standings(self):
-        self.players.sort(key=lambda x: int(x.position.replace('T', '')) if x.position != '--' else 9999)
-        return self.players
-
-
-    def get_pct_complete_str(self, width=0):
-        res = f'{self.get_pct_complete():10.0%}'
-        return ' ' * (width - len(res)) + res
-
-    def _get_members_from_field(self, members: list, field: list):
-        # take list of players and list of identifiers to return list of references to players
-        teammates = []
-        for name in members:
-            name_parts = name.split(' ', 1) if name != 'Byeong Hun An' else ['Byeong Hun', 'An']
-            teammates.append(field.get_golfer_from_name(name_parts[0], name_parts[1]))
-        return teammates
-
-    def get_score_with_defaults(self):
-        scores = []
-        team_score = 0
-        daily_scores = [0, 0, 0, 0]
-        for player in self.players:
-            total, rounds = player.get_score_or_default()
-            # replace all non-integers with default (withdrawn, cut)
-            defaulted = [player] + [
-                {'score': score, 'score_str': self.add_plus(score), 'undefaulted': score,
-                 'undef_str': self.add_plus(score), 'counted': False, 'is_penalty': False} if isinstance(score,
-                                                                                                         int) else {
-                    'score': self.defaults[i], 'score_str': self.add_plus(self.defaults[i]), 'undefaulted': score,
-                    'undef_str': score, 'counted': False, 'is_penalty': True} for i, score in enumerate(rounds)]
-            scores.append(defaulted)
-
-        for round_num in range(1, 5):
-            scores.sort(
-                key=lambda x: x[round_num]['score'])  # this is ugly because player is the first item in the array
-            for player_ix in range(TEAM_SIZE if round_num < SATURDAY_ROUND else WEEKEND_TEAM_SIZE):
-                daily_scores[round_num - 1] += scores[player_ix][round_num]['score']
-                scores[player_ix][round_num]['counted'] = True
-            team_score += daily_scores[round_num - 1]
-        return team_score, scores, daily_scores
-
-    def get_scores_df(self) -> pd.DataFrame:
-        return pd.DataFrame([golfer.get_raw_score_dict() for golfer in self.players])
-
-    def add_plus(self, score: int):
-        if score > 0:
-            return f'+{score}'
-        elif score == 0:
-            return 'E'
-        else:
-            return f'{score}'
-
-
 class Golfer(object):
 
     def __init__(self, raw, par):
@@ -173,29 +92,27 @@ class Golfer(object):
 
         for round in self.rounds:
             round['score'] = int(round['strokes']) - par if round['strokes'] != '--' else None
-            if self._round_title_to_int(round['title']) == int(raw[ 'tournamentRoundId']):  # Todo: confirm that tournamentRoundId works as expected
-                round['score'] = self.to_score(raw['round']) if raw['round'] != '--' else round['score']
-
-    def _round_title_to_int(self, round: str) -> int:
-        return int(round.replace('r', ''))
+            if round_title_to_int(round['title']) == int(
+                    raw['tournamentRoundId']):  # Todo: confirm that tournamentRoundId works as expected
+                round['score'] = to_score(raw['round']) if raw['round'] != '--' else round['score']
 
     def get_score_or_default(self):
         # todo: refactor this to better align with access pattern (eg, no need for separate penalty)
-        scores = [round['score'] if round['score'] else 0 for round in self.rounds]
+        round_scores = [round['score'] if round['score'] else 0 for round in self.rounds]
 
         if self.status == 'active':
-            score = sum(scores)
+            total_score = sum(round_scores)
         elif self.status == 'cut':
-            score = self.rounds[0]['score'] + self.rounds[1]['score']
-            scores[2] = 'cut'
-            scores[3] = 'cut'
+            total_score = self.rounds[0]['score'] + self.rounds[1]['score']
+            round_scores[2] = 'cut'
+            round_scores[3] = 'cut'
         elif self.status in ('wd', 'dq'):
             # todo calculate withdrawn round
-            score = 0
-            scores = [self.status] * 4
+            total_score = 0
+            round_scores = [self.status] * 4
         else:
-            error(f'Unknown Player Status: {self.status}')
-        return score, scores
+            raise Exception(f'Unknown Player Status: {self.status}')
+        return total_score, round_scores
 
     def get_next_tee_time(self):
         if not self.is_active():
@@ -227,11 +144,6 @@ class Golfer(object):
                      'status': self.status}
         return {**info_dict, **scores_dict}
 
-    def to_score(self, score):
-        if score and score != '--' and score != 'E':
-            return int(score)
-        else:
-            return 0
 
 
 class Field(object):
@@ -239,13 +151,12 @@ class Field(object):
         self.par = par
         self.golfers = []
 
-    def get_golfer_from_name(self, first, last, silent=False) -> Golfer:
+    def get_golfer_from_name(self, first: str, last: str, silent=False) -> Golfer:
         for player in self.golfers:
             if player.first_name.lower() == first.lower() and player.last_name.lower() == last.lower():
                 return player
         if not silent:
-            error(f"Unable to find player: {first} {last}")
-        return
+            logger.error(f"Unable to find player: {first} {last}")
 
     def upsert_golfer(self, player_info):
         player = self.get_golfer_from_name(player_info['playerNames']['firstName'],
@@ -256,3 +167,79 @@ class Field(object):
             player = Golfer(player_info, self.par)
             self.golfers.append(player)
         return player
+
+
+class FantasyTeam(object):
+
+    def __init__(self, team_name: str, members: list, field: list, defaults):
+        self.name = team_name
+        self.defaults = defaults
+        self.players = self._get_members_from_field(members, field)
+
+    @property
+    def score(self):
+        return self.get_score_with_defaults()[0]
+
+    def get_pct_complete(self):
+        total_holes = 18.0 * TEAM_SIZE  # todo resolve this
+        team_holes_complete = 0
+        for player in self.players:
+            if player.is_active():
+                if player.round_complete:
+                    team_holes_complete += 18
+                else:
+                    team_holes_complete += str_to_int(player.thru)
+        return team_holes_complete / total_holes
+
+    def get_overall_golfer_standings(self):
+        self.players.sort(key=lambda x: int(x.position.replace('T', '')) if x.position != '--' else 9999)
+        return self.players
+
+    def get_pct_complete_str(self, width=0):
+        res = f'{self.get_pct_complete():10.0%}'
+        return ' ' * (width - len(res)) + res
+
+    def _get_members_from_field(self, members: list, field: Field):
+        # take list of players and list of identifiers to return list of references to players
+        teammates = []
+        for name in members:
+            name_parts = NAME_OVERRIDE_MAP.get(name, name.split(' ', 1))
+            teammates.append(field.get_golfer_from_name(name_parts[0], name_parts[1]))
+        return teammates
+
+    def get_score_with_defaults(self):
+        scores = []
+        team_score = 0
+        daily_scores = [0, 0, 0, 0]
+        for player in self.players:
+            total, rounds = player.get_score_or_default()
+            # replace all non-integers with default (withdrawn, cut)
+            player_rounds = []
+            for i, score in enumerate(rounds):
+                if isinstance(score, int):
+                    player_rounds.append({
+                        'score': score,
+                        'undefaulted_score': score,
+                        'counted': False,
+                        'is_penalty': False
+                    })
+                else:
+                    player_rounds.append({
+                        'score': self.defaults[i],
+                        'undefaulted_score': score,
+                        'counted': False,
+                        'is_penalty': True
+                    })
+            scores.append([player] + player_rounds)
+
+        for round_num in range(1, 5):
+            scores.sort(
+                key=lambda x: x[round_num]['score'])  # this is ugly because player is the first item in the array
+            for player_ix in range(TEAM_SIZE if round_num < SATURDAY_ROUND else WEEKEND_TEAM_SIZE):
+                daily_scores[round_num - 1] += scores[player_ix][round_num]['score']
+                scores[player_ix][round_num]['counted'] = True
+            team_score += daily_scores[round_num - 1]
+        return team_score, scores, daily_scores
+
+    def get_scores_df(self) -> pd.DataFrame:
+        return pd.DataFrame([golfer.get_raw_score_dict() for golfer in self.players])

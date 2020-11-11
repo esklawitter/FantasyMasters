@@ -65,47 +65,7 @@ padding:10px;
 <div class="card-container">
     <div class="card">
         <div class="card-body">
-            <h5 class="card-title">Eric #4 vs Ryan #4</h5>
-            <h6 class="card-subtitle mb-2 text-muted">Wager: $1.00</h6>
-            <table class="table">
-                <tr>
-                    <th scope="col">
-                        Team
-                    </th>
-                    <th scope="col">
-                        Golfer
-                    </th>
-                    <th scope="col">
-                        Status
-                    </th>
-                    <th scope="col">Position</th>
-                    <th scope="col">
-                        Score
-                    </th>
-                    <th scope="col">
-                        Thru
-                    </th>
-                </tr>
-                <tr>
-                    <td>Eric</td>
-                    {% set golfer =comp.get_team_by_name('Eric').get_overall_golfer_standings()[3] %}
-                    <td>{{ golfer.first_name }} {{ golfer.last_name }}</td>
-                    <td>{{ golfer.status.capitalize() }}</td>
-                    <td>{{ golfer.position }}</td>
-                    <td>{{ golfer.total }}</td>
-                    <td>{{ golfer.thru }}</td>
-
-                </tr>
-                <tr>
-                    <td>Ryan</td>
-                    {% set golfer =comp.get_team_by_name('Ryan').get_overall_golfer_standings()[3] %}
-                    <td>{{ golfer.first_name }} {{ golfer.last_name }}</td>
-                    <td>{{ golfer.status.capitalize() }}</td>
-                    <td>{{ golfer.position }}</td>
-                    <td>{{ golfer.total }}</td>
-                    <td>{{ golfer.thru }}</td>
-                </tr>
-            </table>
+            <h1>No prop bets yet!</h1>
         </div>
     </div>
 </div>
