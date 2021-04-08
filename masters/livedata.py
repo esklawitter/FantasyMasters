@@ -31,7 +31,7 @@ class PGADataExtractor(object):
         self.course_info = self.get_course_info()
         self.field = Field(self.course_info.par)
         self.defaults = [0, 0, 0, 0]
-        self.tid = '014'  # tid
+        self.tid = '536'  # tid
         if self.tid is None:
             self.tid = self._get_active_tid()
 
@@ -143,7 +143,7 @@ class PGADataExtractor(object):
         course_info = self._do_get_request(URL_COURSE_INFO).json()['courses'][0]
         holes = [Hole(int(hole['number']), int(hole['parValue']), int(hole['yards']), hole['body']) for hole in
                  course_info['holes']]
-        course_info = CourseInfo(course_info['name'], 70,  # int(course_info['parValue']),
+        course_info = CourseInfo(course_info['name'], 72,  # int(course_info['parValue']),
                                  holes)
         logger.debug(f'Course Name: {course_info.name}. Par: {course_info.par}.')
         return course_info

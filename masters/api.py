@@ -9,7 +9,6 @@ import responder
 from masters.livedata import PGADataExtractor
 from masters.models import Competition
 
-TEAMS_CSV = 'teams/teams_masters_2020.csv'
 
 '''
     general architecture:
@@ -50,11 +49,11 @@ def prop_bets(req, resp):
     refresh_mutex.release()
 
 
-def app(port) -> None:
+def app(port, teams_file) -> None:
     global pga_extractor
     global comp
     pga_extractor = PGADataExtractor(refresh_mutex)  # , tid='041')
-    comp = Competition(pga_extractor.field, TEAMS_CSV, pga_extractor.defaults)
+    comp = Competition(pga_extractor.field, teams_file, pga_extractor.defaults)
     data_update_thread = Thread(target=pga_extractor.start)
     data_update_thread.start()
     api.run(address='0.0.0.0', port=port)
@@ -76,6 +75,7 @@ def set_up_logging() -> None:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int)
+    parser.add_argument('--teams', type=str)
     args = parser.parse_args()
     set_up_logging()
-    app(args.port)
+    app(args.port, args.teams)

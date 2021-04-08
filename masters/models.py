@@ -219,14 +219,14 @@ class FantasyTeam(object):
                 if isinstance(score, int):
                     player_rounds.append({
                         'score': score,
-                        'undefaulted_score': score,
+                        'undefaulted': score,
                         'counted': False,
                         'is_penalty': False
                     })
                 else:
                     player_rounds.append({
                         'score': self.defaults[i],
-                        'undefaulted_score': score,
+                        'undefaulted': score,
                         'counted': False,
                         'is_penalty': True
                     })

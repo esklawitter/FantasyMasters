@@ -51,7 +51,7 @@ width:20%;
 
 <body>
 <div id="Standings Timestamp">
-    <h1 class="display-2">PGA Championship 2020</h1>
+    <h1 class="display-2">The Masters 2020</h1>
     <h3>Standings as of: {{ pga_extractor.results_timestamp.strftime('%a %I:%M%p') }}</h3>
     <h3>Cut Line: {{ pga_extractor['cut_line'] }}</h3>
     <h3><a href="/prop.html">Prop Bets</a></h3>
@@ -95,7 +95,7 @@ width:20%;
             <td>{{ player[0].get_today() }}</td>
             {% for round in player[1:] %}
             <td class="score {{ 'table-warning' if round['counted'] and not round['is_penalty'] else '' }}{{ 'table-danger' if round['counted'] and round['is_penalty'] else '' }}">
-                {{ fmt.score(round['undefaulted_score']) }} {{ '(' ~ fmt.score(round['score']) ~ ')' if round['undefaulted'] is string else ''
+                {{ fmt.score(round['undefaulted']) }} {{ '(' ~ fmt.score(round['score']) ~ ')' if round['undefaulted'] is string else ''
                 }}
             </td>
             {% endfor %}

@@ -30,6 +30,10 @@ class JinjaFormatter:
 
     @staticmethod
     def score(score: int) -> str:
+        try:
+            int(score)
+        except:
+            return score
         if score > 0:
             return f'+{score}'
         elif score == 0:
